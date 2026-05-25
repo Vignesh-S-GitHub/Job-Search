@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A static India job-search launcher with saved filters and portal shortcuts." />
+    <title>Job Search Launcher</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="app-header">
+        <h1>India Job Launcher</h1>
+        <div class="header-actions">
+          <button class="open-all-button" id="openAll" type="button">Open all</button>
+          <button class="filter-button" id="openEditor" type="button">Edit filters</button>
+        </div>
+      </header>
+
+      <section class="summary-card" id="summaryCard" role="button" tabindex="0" aria-label="Open filter editor">
+        <h2 id="summaryTitle">Set filters</h2>
+        <p id="summaryText">Tap to edit filters.</p>
+      </section>
+
+      <section class="portal-grid" id="portalGrid" aria-label="Job portals"></section>
+    </main>
+
+    <dialog class="editor" id="filterDialog">
+      <form class="editor-panel" id="filterForm" method="dialog">
+        <div class="editor-head">
+          <div>
+            <p class="eyebrow">Filter editor</p>
+            <h2>Search details</h2>
+          </div>
+          <button class="close-button" id="closeEditor" type="button" aria-label="Close editor">x</button>
+        </div>
+
+        <label class="field wide">
+          <span>Search keywords</span>
+          <input id="keywords" name="keywords" type="text" placeholder="React developer, data analyst" autocomplete="off" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Min experience</span>
+            <input id="minExperience" name="minExperience" type="number" min="0" placeholder="0" />
+          </label>
+
+          <label class="field">
+            <span>Max experience</span>
+            <input id="maxExperience" name="maxExperience" type="number" min="0" placeholder="8" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Min salary LPA</span>
+            <input id="minSalary" name="minSalary" type="number" min="0" placeholder="6" />
+          </label>
+
+          <label class="field">
+            <span>Max salary LPA</span>
+            <input id="maxSalary" name="maxSalary" type="number" min="0" placeholder="30" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Date posted</span>
+            <select id="datePosted" name="datePosted">
+              <option value="any">Any time</option>
+              <option value="24h">Past 24h</option>
+              <option value="3d">Past 3 days</option>
+              <option value="7d">Past week</option>
+              <option value="14d">Past 2 weeks</option>
+              <option value="30d">Past month</option>
+            </select>
+          </label>
+
+          <label class="switch-field">
+            <span>
+              <strong>Remote only</strong>
+              <small>Apply when supported</small>
+            </span>
+            <input id="remoteOnly" name="remoteOnly" type="checkbox" />
+            <i></i>
+          </label>
+        </div>
+
+        <div class="locations">
+          <div class="locations-head">
+            <span>Locations</span>
+            <button id="clearLocations" type="button">Clear</button>
+          </div>
+          <div class="chip-grid" id="locationChips"></div>
+        </div>
+
+        <p class="form-error" id="formError" role="alert"></p>
+
+        <div class="editor-actions">
+          <button class="secondary-action" id="resetFilters" type="button">Reset</button>
+          <button class="primary-action" type="submit">Save filters</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="script.js"></script>
+  </body>
+</html>
