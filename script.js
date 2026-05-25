@@ -1,35 +1,33 @@
-const STORAGE_KEY = "job-launcher-filters";
+/* ═══════════════════════════════════════════════════════
+   India Job Launcher — script.js
+   ═══════════════════════════════════════════════════════ */
 
+const STORAGE_KEY = "job-launcher-filters";
+const HISTORY_KEY = "job-launcher-history";
+const TOGGLES_KEY = "job-launcher-toggles";
+const MAX_HISTORY = 5;
+
+/* ── Preset Data ───────────────────────────────────── */
 const locations = [
-  "Bengaluru",
-  "Hyderabad",
-  "Pune",
-  "Gurugram",
-  "Mumbai",
-  "Chennai",
-  "Noida",
-  "Delhi NCR",
-  "Ahmedabad",
-  "Kolkata",
-  "Kochi",
-  "Jaipur",
-  "Remote India",
+  "Bengaluru", "Hyderabad", "Pune", "Gurugram", "Mumbai",
+  "Chennai", "Noida", "Delhi NCR", "Ahmedabad", "Kolkata",
+  "Kochi", "Jaipur", "Remote India",
 ];
 
-const dateDays = {
-  "24h": "1",
-  "3d": "3",
-  "7d": "7",
-  "14d": "14",
-  "30d": "30",
-};
+const dateDays = { "24h": "1", "3d": "3", "7d": "7", "14d": "14", "30d": "30" };
 
 const linkedinDate = {
-  "24h": "r86400",
-  "3d": "r259200",
-  "7d": "r604800",
-  "14d": "r1209600",
-  "30d": "r2592000",
+  "24h": "r86400", "3d": "r259200", "7d": "r604800",
+  "14d": "r1209600", "30d": "r2592000",
+};
+
+const linkedinJobType = {
+  fulltime: "F", parttime: "P", contract: "C", internship: "I", freelance: "T",
+};
+
+const naukriJobType = {
+  fulltime: "fullTime", parttime: "partTime", contract: "contractual",
+  internship: "intern", freelance: "freelance",
 };
 
 const defaultFilters = {
@@ -40,177 +38,157 @@ const defaultFilters = {
   maxSalary: "",
   datePosted: "any",
   remoteOnly: false,
+  jobType: "any",
+  sortBy: "relevance",
+  customLocation: "",
   locations: [],
 };
 
+/* ── Portal Definitions ────────────────────────────── */
+// filterSupport: count of how many of our 7 main filter types the portal supports
+// supportedFilters: array of filter names for badge tooltip
 const portals = [
   {
+    id: "linkedin",
     name: "LinkedIn Jobs",
     logo: "linkedin.png",
-    build(filters) {
+    filterSupport: 5,
+    supportedFilters: ["Keywords", "Location", "Date", "Remote", "Job Type"],
+    build(f) {
       const url = new URL("https://www.linkedin.com/jobs/search/");
-      setParam(url, "keywords", filters.keywords);
-      setParam(url, "location", locationText(filters));
-      setParam(url, "f_TPR", linkedinDate[filters.datePosted]);
-      setParam(url, "f_WT", filters.remoteOnly ? "2" : "");
+      setParam(url, "keywords", f.keywords);
+      setParam(url, "location", allLocations(f));
+      setParam(url, "f_TPR", linkedinDate[f.datePosted]);
+      setParam(url, "f_WT", f.remoteOnly ? "3" : ""); // 3 = Remote
+      setParam(url, "f_JT", linkedinJobType[f.jobType]);
+      if (f.sortBy === "date") setParam(url, "sortBy", "DD");
       return url.toString();
     },
   },
   {
+    id: "naukri",
     name: "Naukri.com",
     logo: "naukri.png",
-    build(filters) {
+    filterSupport: 7,
+    supportedFilters: ["Keywords", "Location", "Experience", "Salary", "Date", "Remote", "Job Type"],
+    build(f) {
       const url = new URL("https://www.naukri.com/jobs");
-      setParam(url, "k", filters.keywords);
-      setParam(url, "l", locationText(filters));
-      setParam(url, "experience", filters.minExperience);
-      setParam(url, "ctcFilter", filters.minSalary);
-      setParam(url, "jobAge", dateDays[filters.datePosted]);
-      setParam(url, "wfhType", filters.remoteOnly ? "2" : "");
+      setParam(url, "k", f.keywords);
+      setParam(url, "l", allLocations(f));
+      // experience range
+      if (f.minExperience || f.maxExperience) {
+        setParam(url, "experience", `${f.minExperience || "0"}${f.maxExperience ? "to" + f.maxExperience : ""}`);
+      }
+      // salary — naukri uses lakh values directly
+      if (f.minSalary || f.maxSalary) {
+        const min = f.minSalary || "0";
+        const max = f.maxSalary || "100";
+        setParam(url, "nctFilter", `${min}to${max}`);
+      }
+      setParam(url, "jobAge", dateDays[f.datePosted]);
+      setParam(url, "wfhType", f.remoteOnly ? "2" : "");
+      setParam(url, "jobType", naukriJobType[f.jobType]);
+      if (f.sortBy === "date") setParam(url, "sort", "date");
       return url.toString();
     },
   },
   {
+    id: "indeed",
     name: "Indeed India",
     logo: "indeed.png",
-    build(filters) {
+    filterSupport: 4,
+    supportedFilters: ["Keywords", "Location", "Date", "Remote"],
+    build(f) {
       const url = new URL("https://in.indeed.com/jobs");
-      setParam(url, "q", keywordText(filters));
-      setParam(url, "l", locationText(filters));
-      setParam(url, "fromage", dateDays[filters.datePosted]);
-      setParam(url, "remotejob", filters.remoteOnly ? "1" : "");
+      setParam(url, "q", mergeKeywords(f));
+      setParam(url, "l", allLocations(f));
+      setParam(url, "fromage", dateDays[f.datePosted]);
+      setParam(url, "remotejob", f.remoteOnly ? "1" : "");
+      if (f.sortBy === "date") setParam(url, "sort", "date");
       return url.toString();
     },
   },
   {
-    name: "Instahyre",
-    logo: "instahyre.png",
-    build(filters) {
-      const url = new URL("https://www.instahyre.com/search-jobs/");
-      setParam(url, "q", filters.keywords);
-      setParam(url, "loc", locationText(filters));
-      setParam(url, "exp", filters.minExperience);
-      setParam(url, "remote", filters.remoteOnly ? "true" : "");
-      return url.toString();
-    },
-  },
-  {
-    name: "Hirist",
-    logo: "hirist.png",
-    build(filters) {
-      const url = new URL("https://www.hirist.tech/jobs");
-      setParam(url, "keyword", filters.keywords);
-      setParam(url, "loc", locationText(filters));
-      setParam(url, "exp", filters.minExperience);
-      setParam(url, "remote", filters.remoteOnly ? "true" : "");
-      return url.toString();
-    },
-  },
-  {
+    id: "foundit",
     name: "Foundit",
     logo: "foundit.png",
-    build(filters) {
+    filterSupport: 4,
+    supportedFilters: ["Keywords", "Location", "Experience", "Date"],
+    build(f) {
       const url = new URL("https://www.foundit.in/srp/results");
-      setParam(url, "query", keywordText(filters));
-      setParam(url, "locations", locationText(filters));
-      setParam(url, "experienceRanges", filters.minExperience);
-      setParam(url, "postedDate", dateDays[filters.datePosted]);
+      setParam(url, "query", mergeKeywords(f));
+      setParam(url, "locations", allLocations(f));
+      // experience range format
+      if (f.minExperience || f.maxExperience) {
+        const min = f.minExperience || "0";
+        const max = f.maxExperience || "30";
+        setParam(url, "experienceRanges", `${min}~${max}`);
+      }
+      setParam(url, "postedDate", dateDays[f.datePosted]);
+      if (f.sortBy === "date") setParam(url, "sort", "1");
       return url.toString();
     },
   },
   {
-    name: "Apna",
-    logo: "apna.png",
-    build(filters) {
-      const url = new URL("https://apna.co/jobs");
-      setParam(url, "keyword", keywordText(filters));
-      setParam(url, "location", locationText(filters));
-      setParam(url, "experience", filters.minExperience);
-      return url.toString();
-    },
-  },
-  {
+    id: "glassdoor",
     name: "Glassdoor India",
     logo: "glassdoor.png",
-    build(filters) {
+    filterSupport: 3,
+    supportedFilters: ["Keywords", "Location", "Date"],
+    build(f) {
       const url = new URL("https://www.glassdoor.co.in/Job/jobs.htm");
-      setParam(url, "sc.keyword", keywordText(filters));
-      setParam(url, "locKeyword", locationText(filters));
-      setParam(url, "fromAge", dateDays[filters.datePosted]);
-      return url.toString();
-    },
-  },
-  {
-    name: "Shine.com",
-    logo: "shine.png",
-    build(filters) {
-      const slug = slugify(filters.keywords) || "jobs";
-      const url = new URL(`https://www.shine.com/job-search/${slug}-jobs`);
-      setParam(url, "keyword", keywordText(filters));
-      setParam(url, "location", locationText(filters));
-      setParam(url, "experience", filters.minExperience);
-      setParam(url, "minsalary", filters.minSalary);
-      setParam(url, "posted", dateDays[filters.datePosted]);
-      return url.toString();
-    },
-  },
-  {
-    name: "Cutshort",
-    logo: "cutshort.png",
-    build(filters) {
-      const url = new URL("https://cutshort.io/jobs");
-      setParam(url, "keywords", filters.keywords);
-      setParam(url, "locations", locationText(filters));
-      setParam(url, "minExp", filters.minExperience);
-      setParam(url, "remote", filters.remoteOnly ? "true" : "");
+      setParam(url, "sc.keyword", mergeKeywords(f));
+      setParam(url, "locKeyword", allLocations(f));
+      setParam(url, "fromAge", dateDays[f.datePosted]);
+      if (f.sortBy === "date") setParam(url, "sortBy", "date_desc");
       return url.toString();
     },
   },
 ];
 
+/* ── State ─────────────────────────────────────────── */
 let filters = readFilters();
+let toggles = readToggles();
 
-const dialog = document.getElementById("filterDialog");
-const form = document.getElementById("filterForm");
-const formError = document.getElementById("formError");
-const portalGrid = document.getElementById("portalGrid");
+/* ── DOM Refs ──────────────────────────────────────── */
+const dialog       = document.getElementById("filterDialog");
+const form         = document.getElementById("filterForm");
+const formError    = document.getElementById("formError");
+const portalGrid   = document.getElementById("portalGrid");
 const locationChips = document.getElementById("locationChips");
-const summaryCard = document.getElementById("summaryCard");
+const summaryCard  = document.getElementById("summaryCard");
+const historySection = document.getElementById("historySection");
+const historyList  = document.getElementById("historyList");
+const toastContainer = document.getElementById("toastContainer");
 
+/* ── Helpers ───────────────────────────────────────── */
 function setParam(url, key, value) {
   if (value !== undefined && value !== null && value !== "" && value !== false) {
     url.searchParams.set(key, String(value));
   }
 }
 
-function slugify(value) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+function allLocations(f) {
+  const locs = [...f.locations];
+  if (f.customLocation && f.customLocation.trim()) {
+    locs.push(f.customLocation.trim());
+  }
+  return locs.join(", ");
 }
 
-function locationText(value) {
-  return value.locations.join(", ");
-}
-
-function keywordText(value) {
-  return [value.keywords.trim(), value.remoteOnly ? "remote" : ""].filter(Boolean).join(" ");
+function mergeKeywords(f) {
+  return [f.keywords.trim(), f.remoteOnly ? "remote" : ""].filter(Boolean).join(" ");
 }
 
 function iconUrl(fileName) {
   return `logos/${fileName}`;
 }
 
+/* ── Persistence ───────────────────────────────────── */
 function readFilters() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!stored || typeof stored !== "object") {
-      return { ...defaultFilters };
-    }
-
+    if (!stored || typeof stored !== "object") return { ...defaultFilters };
     return {
       ...defaultFilters,
       ...stored,
@@ -228,6 +206,107 @@ function saveFilters() {
   renderSummary();
 }
 
+function readToggles() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(TOGGLES_KEY));
+    if (!stored || typeof stored !== "object") {
+      const defaults = {};
+      portals.forEach(p => defaults[p.id] = true);
+      return defaults;
+    }
+    // ensure all portals have an entry
+    portals.forEach(p => {
+      if (stored[p.id] === undefined) stored[p.id] = true;
+    });
+    return stored;
+  } catch {
+    const defaults = {};
+    portals.forEach(p => defaults[p.id] = true);
+    return defaults;
+  }
+}
+
+function saveToggles() {
+  localStorage.setItem(TOGGLES_KEY, JSON.stringify(toggles));
+}
+
+/* ── Search History ────────────────────────────────── */
+function readHistory() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(HISTORY_KEY));
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToHistory(f) {
+  if (!f.keywords.trim()) return;
+  let history = readHistory();
+  // remove duplicates by keywords
+  history = history.filter(h => h.keywords !== f.keywords);
+  history.unshift({ ...f });
+  if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+
+function removeFromHistory(index) {
+  let history = readHistory();
+  history.splice(index, 1);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  renderHistory();
+}
+
+function restoreFromHistory(entry) {
+  filters = { ...defaultFilters, ...entry, locations: [...(entry.locations || [])] };
+  saveFilters();
+  renderPortals();
+  showToast("Filters restored from history", "info");
+}
+
+function renderHistory() {
+  const history = readHistory();
+  if (!history.length) {
+    historySection.style.display = "none";
+    return;
+  }
+  historySection.style.display = "";
+  historyList.innerHTML = "";
+
+  history.forEach((entry, idx) => {
+    const chip = document.createElement("div");
+    chip.className = "history-chip";
+    chip.setAttribute("role", "button");
+    chip.setAttribute("tabindex", "0");
+
+    const label = document.createElement("span");
+    const parts = [entry.keywords];
+    if (entry.locations && entry.locations.length) parts.push(entry.locations.slice(0, 2).join(", "));
+    label.textContent = parts.join(" · ");
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "history-remove";
+    removeBtn.textContent = "✕";
+    removeBtn.setAttribute("aria-label", "Remove this search");
+    removeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeFromHistory(idx);
+    });
+
+    chip.appendChild(label);
+    chip.appendChild(removeBtn);
+
+    chip.addEventListener("click", () => restoreFromHistory(entry));
+    chip.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); restoreFromHistory(entry); }
+    });
+
+    historyList.appendChild(chip);
+  });
+}
+
+/* ── URL State ─────────────────────────────────────── */
 function writeUrl() {
   const params = new URLSearchParams();
   setQuery(params, "q", filters.keywords.trim());
@@ -237,23 +316,21 @@ function writeUrl() {
   setQuery(params, "maxSal", filters.maxSalary);
   setQuery(params, "date", filters.datePosted === "any" ? "" : filters.datePosted);
   setQuery(params, "remote", filters.remoteOnly ? "1" : "");
+  setQuery(params, "type", filters.jobType === "any" ? "" : filters.jobType);
+  setQuery(params, "sort", filters.sortBy === "relevance" ? "" : filters.sortBy);
+  setQuery(params, "customLoc", filters.customLocation);
   setQuery(params, "loc", filters.locations.join("|"));
   const next = `${location.pathname}${params.toString() ? `?${params}` : ""}`;
   history.replaceState(null, "", next);
 }
 
 function setQuery(params, key, value) {
-  if (value) {
-    params.set(key, value);
-  }
+  if (value) params.set(key, value);
 }
 
 function loadFromUrl() {
   const params = new URLSearchParams(location.search);
-  if (![...params.keys()].length) {
-    return;
-  }
-
+  if (![...params.keys()].length) return;
   filters = {
     ...filters,
     keywords: params.get("q") || "",
@@ -263,10 +340,14 @@ function loadFromUrl() {
     maxSalary: params.get("maxSal") || "",
     datePosted: params.get("date") || "any",
     remoteOnly: params.get("remote") === "1",
+    jobType: params.get("type") || "any",
+    sortBy: params.get("sort") || "relevance",
+    customLocation: params.get("customLoc") || "",
     locations: (params.get("loc") || "").split("|").filter(Boolean),
   };
 }
 
+/* ── Form ──────────────────────────────────────────── */
 function fillForm() {
   form.elements.keywords.value = filters.keywords;
   form.elements.minExperience.value = filters.minExperience;
@@ -275,6 +356,9 @@ function fillForm() {
   form.elements.maxSalary.value = filters.maxSalary;
   form.elements.datePosted.value = filters.datePosted;
   form.elements.remoteOnly.checked = filters.remoteOnly;
+  form.elements.jobType.value = filters.jobType;
+  form.elements.sortBy.value = filters.sortBy;
+  form.elements.customLocation.value = filters.customLocation || "";
   renderLocationChips();
 }
 
@@ -287,76 +371,106 @@ function readForm() {
     maxSalary: form.elements.maxSalary.value,
     datePosted: form.elements.datePosted.value,
     remoteOnly: form.elements.remoteOnly.checked,
+    jobType: form.elements.jobType.value,
+    sortBy: form.elements.sortBy.value,
+    customLocation: form.elements.customLocation.value.trim(),
     locations: [...filters.locations],
   };
 }
 
 function validateFilters() {
-  if (!filters.keywords.trim()) {
-    return "Enter search keywords first.";
-  }
-
+  if (!filters.keywords.trim()) return "Enter search keywords first.";
   if (Number(filters.maxExperience) && Number(filters.minExperience) > Number(filters.maxExperience)) {
-    return "Minimum experience cannot be greater than maximum experience.";
+    return "Min experience cannot exceed max experience.";
   }
-
   if (Number(filters.maxSalary) && Number(filters.minSalary) > Number(filters.maxSalary)) {
-    return "Minimum salary cannot be greater than maximum salary.";
+    return "Min salary cannot exceed max salary.";
   }
-
   return "";
 }
 
+/* ── Location Chips ────────────────────────────────── */
 function renderLocationChips() {
   locationChips.innerHTML = "";
-
-  locations.forEach((locationName) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = filters.locations.includes(locationName) ? "chip active" : "chip";
-    button.textContent = locationName;
-    button.setAttribute("aria-pressed", String(filters.locations.includes(locationName)));
-    button.addEventListener("click", () => {
-      if (filters.locations.includes(locationName)) {
-        filters.locations = filters.locations.filter((item) => item !== locationName);
+  locations.forEach((locName) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = filters.locations.includes(locName) ? "chip active" : "chip";
+    btn.textContent = locName;
+    btn.setAttribute("aria-pressed", String(filters.locations.includes(locName)));
+    btn.addEventListener("click", () => {
+      if (filters.locations.includes(locName)) {
+        filters.locations = filters.locations.filter(l => l !== locName);
       } else {
-        filters.locations.push(locationName);
+        filters.locations.push(locName);
       }
       renderLocationChips();
     });
-    locationChips.appendChild(button);
+    locationChips.appendChild(btn);
   });
 }
 
+/* ── Summary ───────────────────────────────────────── */
 function renderSummary() {
   const title = document.getElementById("summaryTitle");
   const text = document.getElementById("summaryText");
   const parts = [];
 
-  if (filters.locations.length) {
-    parts.push(filters.locations.join(", "));
-  }
-
+  if (filters.locations.length) parts.push(filters.locations.join(", "));
+  if (filters.customLocation) parts.push(filters.customLocation);
   if (filters.minExperience || filters.maxExperience) {
-    parts.push(`${filters.minExperience || "0"}-${filters.maxExperience || "any"} yrs`);
+    parts.push(`${filters.minExperience || "0"}–${filters.maxExperience || "any"} yrs`);
   }
-
   if (filters.minSalary || filters.maxSalary) {
-    parts.push(`${filters.minSalary || "0"}-${filters.maxSalary || "any"} LPA`);
+    parts.push(`₹${filters.minSalary || "0"}–${filters.maxSalary || "any"} LPA`);
   }
+  if (filters.jobType !== "any") parts.push(filters.jobType);
+  if (filters.remoteOnly) parts.push("Remote");
 
   title.textContent = filters.keywords || "Set filters";
-  text.textContent = parts.length ? parts.join(" / ") : "Tap to edit filters.";
+  text.textContent = parts.length ? parts.join(" · ") : "Tap to configure your search filters.";
 }
 
+/* ── Toast Notifications ───────────────────────────── */
+function showToast(message, type = "info", duration = 3000) {
+  const icons = { success: "✓", warning: "⚠", error: "✕", info: "ℹ" };
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-out");
+    toast.addEventListener("animationend", () => toast.remove());
+  }, duration);
+}
+
+/* ── Portal Rendering ──────────────────────────────── */
 function renderPortals() {
   portalGrid.innerHTML = "";
 
-  portals.forEach((portal) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "portal-button";
+  portals.forEach((portal, index) => {
+    const card = document.createElement("div");
+    card.className = "portal-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    if (!toggles[portal.id]) card.classList.add("disabled");
+    card.style.animationDelay = `${index * 80}ms`;
 
+    // Toggle switch
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = `portal-toggle ${toggles[portal.id] ? "active" : ""}`;
+    toggle.setAttribute("aria-label", `Toggle ${portal.name}`);
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggles[portal.id] = !toggles[portal.id];
+      saveToggles();
+      toggle.classList.toggle("active");
+      card.classList.toggle("disabled");
+    });
+
+    // Icon
     const icon = document.createElement("span");
     icon.className = "app-icon";
 
@@ -367,37 +481,63 @@ function renderPortals() {
     image.referrerPolicy = "no-referrer";
     image.addEventListener("error", () => {
       image.remove();
-      icon.textContent = portal.name
-        .split(/\s+/)
-        .map((word) => word[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
+      icon.textContent = portal.name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
       icon.classList.add("icon-fallback");
     });
+    icon.appendChild(image);
 
+    // Label
     const label = document.createElement("span");
     label.className = "portal-label";
     label.textContent = portal.name;
 
-    icon.appendChild(image);
-    button.append(icon, label);
+    // Filter badge
+    const badge = document.createElement("span");
+    const total = 7;
+    const pct = Math.round((portal.filterSupport / total) * 100);
+    badge.className = `filter-badge ${pct >= 70 ? "high" : "medium"}`;
+    badge.textContent = `${portal.filterSupport}/${total} filters`;
+    badge.title = `Supports: ${portal.supportedFilters.join(", ")}`;
 
-    button.addEventListener("click", () => {
+    // URL Preview tooltip
+    const tooltip = document.createElement("div");
+    tooltip.className = "url-preview";
+    tooltip.textContent = "Set filters to preview URL";
+
+    card.append(toggle, icon, label, badge, tooltip);
+
+    function handleCardClick(e) {
+      // Don't trigger card action when clicking the toggle
+      if (e.target.closest(".portal-toggle")) return;
+      if (!toggles[portal.id]) return;
       const error = validateFilters();
       if (error) {
         formError.textContent = error;
         openEditor();
         return;
       }
-
-      window.open(portal.build(filters), "_blank", "noopener,noreferrer");
+      const url = portal.build(filters);
+      window.open(url, "_blank", "noopener,noreferrer");
+      showToast(`Opening ${portal.name}…`, "info", 2000);
+    }
+    card.addEventListener("click", handleCardClick);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCardClick(e); }
     });
 
-    portalGrid.appendChild(button);
+    // Update tooltip on hover
+    card.addEventListener("mouseenter", () => {
+      if (filters.keywords.trim()) {
+        try { tooltip.textContent = portal.build(filters); }
+        catch { tooltip.textContent = "Could not build URL"; }
+      }
+    });
+
+    portalGrid.appendChild(card);
   });
 }
 
+/* ── Open All with Progress ────────────────────────── */
 function openAllPortals() {
   const error = validateFilters();
   if (error) {
@@ -406,15 +546,42 @@ function openAllPortals() {
     return;
   }
 
-  if (!window.confirm(`Open all ${portals.length} portals in new tabs?`)) {
+  const active = portals.filter(p => toggles[p.id]);
+  if (!active.length) {
+    showToast("No portals enabled. Toggle at least one.", "warning");
     return;
   }
 
-  portals.forEach((portal) => {
-    window.open(portal.build(filters), "_blank", "noopener,noreferrer");
+  if (!window.confirm(`Open ${active.length} portal${active.length > 1 ? "s" : ""} in new tabs?`)) return;
+
+  // Show progress indicator
+  const progress = document.createElement("div");
+  progress.className = "open-progress";
+  progress.innerHTML = `
+    <span class="progress-text">Opening 0/${active.length}…</span>
+    <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+  `;
+  document.body.appendChild(progress);
+
+  let opened = 0;
+  active.forEach((portal, i) => {
+    setTimeout(() => {
+      window.open(portal.build(filters), "_blank", "noopener,noreferrer");
+      opened++;
+      progress.querySelector(".progress-text").textContent = `Opening ${opened}/${active.length}…`;
+      progress.querySelector(".progress-fill").style.width = `${(opened / active.length) * 100}%`;
+
+      if (opened === active.length) {
+        setTimeout(() => {
+          progress.querySelector(".progress-text").textContent = `All ${active.length} opened ✓`;
+          setTimeout(() => progress.remove(), 1500);
+        }, 400);
+      }
+    }, i * 350); // stagger to avoid popup blockers
   });
 }
 
+/* ── Editor ────────────────────────────────────────── */
 function openEditor() {
   fillForm();
   formError.textContent = "";
@@ -429,14 +596,12 @@ function closeEditor() {
   dialog.close();
 }
 
+/* ── Event Listeners ───────────────────────────────── */
 document.getElementById("openEditor").addEventListener("click", openEditor);
 document.getElementById("openAll").addEventListener("click", openAllPortals);
 summaryCard.addEventListener("click", openEditor);
-summaryCard.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    openEditor();
-  }
+summaryCard.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEditor(); }
 });
 
 document.getElementById("closeEditor").addEventListener("click", closeEditor);
@@ -452,19 +617,23 @@ document.getElementById("resetFilters").addEventListener("click", () => {
   formError.textContent = "";
 });
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
   readForm();
   const error = validateFilters();
   if (error) {
     formError.textContent = error;
     return;
   }
-
   saveFilters();
+  saveToHistory(filters);
   closeEditor();
+  renderPortals(); // refresh URL previews
+  showToast("Filters saved successfully!", "success");
 });
 
+/* ── Initialise ────────────────────────────────────── */
 loadFromUrl();
 saveFilters();
 renderPortals();
+renderHistory();
