@@ -10,7 +10,6 @@ const presets=[
 const dateSeconds={"24h":"r86400","7d":"r604800","30d":"r2592000"};
 const dateDays={"24h":"1","7d":"7","30d":"30"};
 
-function slugify(v){return v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
 function hiristPath(s){
  const q=s.keywords.toLowerCase();
  if(q.includes('azure')&&q.includes('databricks')) return 'azure-databricks-jobs';
@@ -35,9 +34,9 @@ const portals=[
   build:s=>new URL(`https://www.hirist.tech/k/${hiristPath(s)}`)
  },
  {
-  id:'instahyre',name:'Instahyre',logo:'logos/instahyre.png',support:'Profile-based opportunity matches',level:'manual',
-  note:'Instahyre primarily matches opportunities from your profile, skills, location and notice period. Open Opportunities and keep your profile preferences updated; dashboard filters cannot be forced reliably by URL.',
-  build:()=>new URL('https://www.instahyre.com/candidate/opportunities/')
+  id:'instahyre',name:'Instahyre',logo:'logos/instahyre.png',support:'Profile-based matching opportunities',level:'manual',
+  note:'Instahyre primarily matches opportunities from your profile, skills, location and notice period. The dashboard opens the matching-opportunities view; keep your profile preferences updated.',
+  build:()=>new URL('https://www.instahyre.com/candidate/opportunities/?matching=true')
  },
  {
   id:'indeed',name:'Indeed',logo:'logos/indeed.png',support:'Keywords · location · date · newest',level:'direct',
