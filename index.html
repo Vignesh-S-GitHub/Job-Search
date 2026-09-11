@@ -3,70 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1020" />
-  <meta name="description" content="One dashboard for repeatable Azure Data Engineer job searches across top Indian job portals." />
-  <title>Azure Data Engineer Job Dashboard</title>
+  <meta name="theme-color" content="#f7f8fb" />
+  <meta name="description" content="Simple Azure Data Engineer job search dashboard." />
+  <title>Job Search Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">JOB SEARCH CONTROL CENTER</p>
-        <h1>Azure Data Engineer</h1>
-        <p class="subtitle">Set once. Open the same filtered searches from mobile or laptop.</p>
+        <h1>Job Search</h1>
+        <p class="subtitle">Azure Data Engineer · 4–6 years · India</p>
       </div>
-      <button class="secondary" id="shareBtn" type="button">Copy dashboard link</button>
+      <div class="top-actions">
+        <button class="button ghost" id="shareBtn" type="button">Copy link</button>
+        <button class="button" id="editBtn" type="button">Filters</button>
+      </div>
     </header>
 
-    <section class="status-card">
-      <div>
-        <span class="status-label">Target</span>
-        <strong>4–6 years · India · Full-time</strong>
-      </div>
-      <div>
-        <span class="status-label">Core skills</span>
-        <strong>Azure · Databricks · PySpark · ADF · ADLS · SQL · Python</strong>
-      </div>
-    </section>
+    <section class="preset-grid" id="presetGrid" aria-label="Search presets"></section>
 
-    <section class="preset-section">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">ONE-TAP PRESETS</p>
-          <h2>Daily searches</h2>
-        </div>
-        <button class="ghost" id="editBtn" type="button">Edit filters</button>
-      </div>
-      <div class="preset-grid" id="presetGrid"></div>
-    </section>
+    <div class="section-row">
+      <h2>Portals</h2>
+      <button class="button ghost" id="openAllBtn" type="button">Open all</button>
+    </div>
+    <section class="portal-grid" id="portalGrid" aria-label="Job portals"></section>
 
-    <section class="portal-section">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">PORTALS</p>
-          <h2>Open current search</h2>
-        </div>
-        <button class="primary" id="openAllBtn" type="button">Open all</button>
-      </div>
-      <div class="portal-grid" id="portalGrid"></div>
-    </section>
-
-    <section class="tip-card">
-      <strong>Recommended routine</strong>
-      <p>Morning: open 24h preset. Evening: open 24h again. Every 2–3 days: use 7-day catch-up.</p>
-    </section>
-
-    <footer>Manual applications only · No scraping · No auto-apply</footer>
+    <p class="footer-note">Use 24h daily. Use 7 days every 2–3 days.</p>
   </main>
 
   <dialog id="filterDialog">
     <form id="filterForm" method="dialog" class="dialog-card">
       <div class="dialog-head">
-        <div>
-          <p class="eyebrow">SEARCH SETTINGS</p>
-          <h2>Edit once</h2>
-        </div>
+        <h2>Search filters</h2>
         <button class="icon-btn" id="closeBtn" type="button" aria-label="Close">×</button>
       </div>
 
@@ -77,11 +46,11 @@
 
       <div class="two-col">
         <label>
-          <span>Minimum experience</span>
+          <span>Min experience</span>
           <input id="minExp" name="minExp" type="number" min="0" max="30" />
         </label>
         <label>
-          <span>Maximum experience</span>
+          <span>Max experience</span>
           <input id="maxExp" name="maxExp" type="number" min="0" max="30" />
         </label>
       </div>
@@ -110,8 +79,8 @@
       </div>
 
       <div class="dialog-actions">
-        <button class="secondary" id="resetBtn" type="button">Reset</button>
-        <button class="primary" type="submit">Save filters</button>
+        <button class="button ghost" id="resetBtn" type="button">Reset</button>
+        <button class="button" type="submit">Save</button>
       </div>
     </form>
   </dialog>
